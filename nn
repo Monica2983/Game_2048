@@ -1,1 +1,452 @@
-h
+'''Feed Froward NN
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.optimizers import SGD
+import matplotlib.pyplot as plt
+np.random.seed(42)
+x_train = np.random.rand(200, 2) 
+y_train = (x_train[:, 0] + x_train[:, 1] > 1).astype(int).reshape(-1, 1) 
+plt.scatter(x_train[y_train.flatten() == 0][:, 0], x_train[y_train.flatten() == 0][:, 1], label="Class 0")
+plt.scatter(x_train[y_train.flatten() == 1][:, 0], x_train[y_train.flatten() == 1][:, 1], label="Class 1")
+plt.xlabel("x1")
+plt.ylabel("x2")
+plt.legend()
+plt.title("Synthetic Dataset")
+plt.show()
+model = Sequential([
+ Dense(16, input_dim=2, activation='relu'), 
+ Dense(8, activation='relu'), 
+ Dense(1, activation='sigmoid') 
+])
+model.compile(optimizer=SGD(learning_rate=0.1),loss='binary_crossentropy',metrics=['accuracy'])
+history = model.fit(x_train, y_train, epochs=100, verbose=1)
+print("\nModel Evaluation:")
+loss, accuracy = model.evaluate(x_train, y_train)
+print(f"Loss: {loss}, Accuracy: {accuracy}")
+xx, yy = np.meshgrid(np.linspace(0, 1, 100), np.linspace(0, 1, 100))
+grid = np.c_[xx.ravel(), yy.ravel()]
+preds = model.predict(grid).reshape(xx.shape)
+plt.contourf(xx, yy, preds, levels=[0, 0.5, 1], cmap="coolwarm", alpha=0.6)
+plt.scatter(x_train[y_train.flatten() == 0][:, 0], x_train[y_train.flatten() == 0][:, 1], label="Class 0", 
+edgecolor="k")
+plt.scatter(x_train[y_train.flatten() == 1][:, 0], x_train[y_train.flatten() == 1][:, 1], label="Class 1", 
+edgecolor="k")
+plt.xlabel("x1")
+plt.ylabel("x2")
+plt.legend()
+plt.title("Decision Boundary (FNN)")
+plt.show()
+
+
+_______________________________
+transfer learning
+import tensorflow as tf
+from tensorflow.keras import layers, models, optimizers
+from tensorflow.keras.applications import VGG16
+from tensorflow.keras.datasets import cifar10
+from tensorflow.keras.utils import to_categorical
+# Load and preprocess the CIFAR-10 dataset
+(X_train, y_train), (X_test, y_test) = cifar10.load_data()
+# Normalize the images to range [0, 1]
+X_train = X_train.astype('float32') / 255.0
+X_test = X_test.astype('float32') / 255.0
+# One-hot encode the labels
+y_train = to_categorical(y_train, 10)
+y_test = to_categorical(y_test, 10)
+# Load the pre-trained VGG16 model (without the top fully connected layers)
+base_model = VGG16(weights='imagenet', include_top=False, input_shape=(32, 32, 3))
+# Freeze the layers of the base model
+base_model.trainable = False
+# Build the model by adding custom layers on top of the VGG16 model
+model = models.Sequential([
+ base_model, # Add the pre-trained base model
+ layers.Flatten(), # Flatten the output from the convolutional layers
+ layers.Dense(512, activation='relu'), # Add a fully connected layer
+ layers.Dropout(0.5), # Dropout for regularization
+ layers.Dense(10, activation='softmax') # Output layer with 10 classes for CIFAR-10
+])
+# Compile the model
+model.compile(optimizer=optimizers.Adam(learning_rate=0.0001),
+ loss='categorical_crossentropy',
+ metrics=['accuracy'])
+# Train the model on CIFAR-10 dataset
+model.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=2, batch_size=64)
+# Evaluate the model
+test_loss, test_accuracy = model.evaluate(X_test, y_test)
+print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
+
+
+_____________________________
+
+Sentiment analysis
+import tensorflow as tf
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.datasets import imdb
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, SimpleRNN, Dense, Dropout
+from tensorflow.keras.optimizers import Adam
+max_words = 10000 
+(X_train, y_train), (X_test, y_test) = imdb.load_data(num_words=max_words)
+maxlen = 500 
+X_train = pad_sequences(X_train, maxlen=maxlen)
+X_test = pad_sequences(X_test, maxlen=maxlen)
+model = Sequential()
+model.add(Embedding(input_dim=max_words, output_dim=128, input_length=maxlen))
+model.add(SimpleRNN(128, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(1, activation='sigmoid'))
+model.compile(optimizer=Adam(learning_rate=0.001), 
+ loss='binary_crossentropy', 
+ metrics=['accuracy'])
+history = model.fit(X_train, y_train, 
+ validation_data=(X_test, y_test),
+ epochs=1, 
+ batch_size=64)
+test_loss, test_accuracy = model.evaluate(X_test, y_test)
+print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
+example_review = "The movie was fantastic! I loved it."
+example_review_tokenized = imdb.get_word_index()
+example_review = [example_review_tokenized.get(word, 0) for word in example_review.lower().split()]
+example_review = pad_sequences([example_review], maxlen=maxlen)
+prediction = model.predict(example_review)
+if prediction[0] > 0.5:
+ print("Sentiment: Positive")
+else:
+ print("Sentiment: Negative")
+
+
+________________________________
+
+LSTM
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+data = np.sin(np.linspace(0, 100, 1000)) 
+data = data.reshape(-1, 1)
+scaler = MinMaxScaler()
+data_scaled = scaler.fit_transform(data)
+sequence_length = 50
+X = []
+y = []
+for i in range(len(data_scaled) - sequence_length):
+ X.append(data_scaled[i:i+sequence_length])
+ y.append(data_scaled[i+1:i+sequence_length+1])
+X = np.array(X)
+y = np.array(y)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+def create_lstm_autoencoder(sequence_length, input_dim):
+ model = models.Sequential()
+ model.add(layers.LSTM(64, activation='relu', input_shape=(sequence_length, input_dim), 
+return_sequences=False))
+ model.add(layers.RepeatVector(sequence_length))
+ model.add(layers.LSTM(64, activation='relu', return_sequences=True))
+ model.add(layers.TimeDistributed(layers.Dense(input_dim)))
+ model.compile(optimizer='adam', loss='mse')
+ return model
+model = create_lstm_autoencoder(sequence_length=X_train.shape[1], input_dim=X_train.shape[2])
+history = model.fit(X_train, y_train, epochs=2, batch_size=32, validation_data=(X_test, y_test))
+loss = model.evaluate(X_test, y_test)
+print(f"Test Loss: {loss:.4f}")
+# Example: Reconstruct a sequence from the test set
+reconstructed = model.predict(X_test)
+import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 6))
+plt.plot(np.arange(sequence_length), X_test[0], label='Original')
+plt.plot(np.arange(sequence_length), reconstructed[0], label='Reconstructed')
+plt.legend()
+plt.title("Original vs Reconstructed Sequence") 
+plt.show()
+
+
+________________________________
+
+GAN
+import tensorflow as tf
+from tensorflow.keras import layers, models
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.datasets import mnist
+# Load and preprocess the MNIST dataset
+(X_train, _), (_, _) = mnist.load_data()
+X_train = X_train.astype('float32') / 255.0 # Normalize the data to [0, 1]
+X_train = X_train.reshape(X_train.shape[0], 28, 28, 1) # Reshape to (28, 28, 1)
+# Generator Model: Converts random noise to an image
+def build_generator():
+ model = models.Sequential()
+ model.add(layers.Dense(128, input_dim=100))
+ model.add(layers.LeakyReLU(0.2))
+ model.add(layers.BatchNormalization(momentum=0.8))
+ model.add(layers.Dense(256))
+ model.add(layers.LeakyReLU(0.2))
+ model.add(layers.BatchNormalization(momentum=0.8))
+ model.add(layers.Dense(512))
+ model.add(layers.LeakyReLU(0.2))
+ model.add(layers.BatchNormalization(momentum=0.8))
+ model.add(layers.Dense(1024))
+ model.add(layers.LeakyReLU(0.2))
+ model.add(layers.BatchNormalization(momentum=0.8))
+ model.add(layers.Dense(28 * 28 * 1, activation='tanh')) # 28x28 image with 1 channel
+ model.add(layers.Reshape((28, 28, 1))) # Reshape into an image
+ return model
+# Discriminator Model: Classifies images as real or fake
+def build_discriminator():
+ model = models.Sequential()
+ model.add(layers.Flatten(input_shape=(28, 28, 1)))
+ model.add(layers.Dense(512))
+ model.add(layers.LeakyReLU(0.2))
+ model.add(layers.Dense(256))
+ model.add(layers.LeakyReLU(0.2))
+ model.add(layers.Dense(1, activation='sigmoid')) # Output a probability (real or fake)
+ return model
+# GAN Model: Combines generator and discriminator for adversarial training
+def build_gan(generator, discriminator):
+ discriminator.trainable = False # We only train the generator in the GAN
+ model = models.Sequential()
+ model.add(generator)
+ model.add(discriminator)
+ return model
+discriminator = build_discriminator()
+
+discriminator.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+# Build the generator
+generator = build_generator()
+gan = build_gan(generator, discriminator)
+gan.compile(optimizer='adam', loss='binary_crossentropy')
+def train_gan(epochs, batch_size, save_interval):
+ half_batch = batch_size // 2
+ 
+ for epoch in range(epochs):
+ idx = np.random.randint(0, X_train.shape[0], half_batch)
+ real_images = X_train[idx]
+ real_labels = np.ones((half_batch, 1)) # Real images are labeled as 1
+ 
+ noise = np.random.normal(0, 1, (half_batch, 100)) # Random noise for generator
+ fake_images = generator.predict(noise)
+ fake_labels = np.zeros((half_batch, 1)) 
+ d_loss_real = discriminator.train_on_batch(real_images, real_labels)
+ d_loss_fake = discriminator.train_on_batch(fake_images, fake_labels)
+ d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+ noise = np.random.normal(0, 1, (batch_size, 100))
+ valid_labels = np.ones((batch_size, 1)) # Generator aims to fool the discriminator
+ g_loss = gan.train_on_batch(noise, valid_labels)
+ if epoch % save_interval == 0:
+ print(f"{epoch} [D loss: {d_loss[0]} | D accuracy: {100*d_loss[1]}] [G loss: {g_loss}]")
+ if epoch % (save_interval * 10) == 0:
+ save_generated_images(epoch)
+def save_generated_images(epoch, examples=16, dim=(4, 4), figsize=(10, 10)):
+ noise = np.random.normal(0, 1, (examples, 100))
+ generated_images = generator.predict(noise)
+ generated_images = generated_images.reshape(examples, 28, 28)
+ plt.figure(figsize=figsize)
+ for i in range(examples):
+ plt.subplot(dim[0], dim[1], i+1)
+ plt.imshow(generated_images[i], interpolation='nearest', cmap='gray')
+ plt.axis('off')
+ plt.tight_layout()
+ plt.savefig(f"generated_image_{epoch}.png")
+ plt.close()
+train_gan(epochs=10000, batch_size=64, save_interval=1000)
+
+_____________________________
+
+Image classification using CNN
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.keras.datasets import cifar10
+from tensorflow.keras.utils import to_categorical
+import matplotlib.pyplot as plt
+# Load CIFAR-10 dataset
+(x_train, y_train), (x_test, y_test) = cifar10.load_data()
+# Normalize the data
+x_train = x_train.astype('float32') / 255.0
+x_test = x_test.astype('float32') / 255.0
+# Convert labels to one-hot encoding
+y_train = to_categorical(y_train, 10)
+y_test = to_categorical(y_test, 10)
+# Define CNN model
+model = Sequential([
+ Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)),
+ MaxPooling2D((2, 2)),
+ Conv2D(64, (3, 3), activation='relu'),
+ MaxPooling2D((2, 2)),
+ Conv2D(128, (3, 3), activation='relu'),
+ Flatten(),
+ Dense(128, activation='relu'),
+ Dropout(0.5),
+ Dense(10, activation='softmax')
+])
+# Compile the model
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+# Train the model
+history = model.fit(x_train, y_train, epochs=15, batch_size=64, validation_split=0.2, verbose=1)
+# Evaluate the model on the test set
+test_loss, test_accuracy = model.evaluate(x_test, y_test, verbose=0)
+print(f"Test Accuracy: {test_accuracy:.2f}")
+# Plot training and validation accuracy
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.title('Accuracy over Epochs')
+plt.show()
+
+predictions = model.predict(x_test)
+from tensorflow.keras.utils import load_img, img_to_array
+import numpy as np
+import matplotlib.pyplot as plt
+# Class names for CIFAR-10 dataset
+class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
+ 'dog', 'frog', 'horse', 'ship', 'truck']
+# Load and preprocess the image
+def preprocess_image(image_path):
+ img = load_img(image_path, target_size=(32, 32)) # Resize to 32x32
+ plt.imshow(img) # Display the image
+ plt.title("Input Image")
+ plt.show()
+ img_array = img_to_array(img) # Convert to numpy array
+ img_array = img_array.astype('float32') / 255.0 # Normalize
+ return np.expand_dims(img_array, axis=0) # Add batch dimension
+# Path to your image
+image_path = '/content/plane.jpeg'
+# Preprocess and predict
+image = preprocess_image(image_path)
+prediction = model.predict(image)
+# Display prediction
+predicted_class = np.argmax(prediction, axis=1)[0]
+print(f"Predicted Class: {class_names[predicted_class]}")
+
+
+____________________________________
+
+Hyperparameter tuning
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.callbacks import EarlyStopping
+# Load and preprocess the dataset
+(x_train, y_train), (x_test, y_test) = mnist.load_data()
+x_train = x_train.reshape(-1, 28, 28, 1).astype('float32') / 255.0
+x_test = x_test.reshape(-1, 28, 28, 1).astype('float32') / 255.0
+y_train = to_categorical(y_train, 10)
+y_test = to_categorical(y_test, 10)
+def create_model(learning_rate=0.001, dropout_rate=0.5):
+ model = models.Sequential([
+ layers.Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1)),
+ layers.MaxPooling2D((2, 2)),
+ layers.Conv2D(64, (3, 3), activation='relu'),
+ layers.MaxPooling2D((2, 2)),
+ layers.Flatten(),
+ layers.Dense(128, activation='relu'),
+ layers.Dropout(dropout_rate),
+ layers.Dense(10, activation='softmax')
+ ])
+ optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+ model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+ return model
+learning_rates = [0.001, 0.0005, 0.0001]
+dropout_rates = [0.3, 0.5, 0.7]
+best_model = None
+best_accuracy = 0
+for lr in learning_rates:
+ for dr in dropout_rates:
+ print(f"Training model with LR={lr} and Dropout={dr}")
+ model = create_model(learning_rate=lr, dropout_rate=dr)
+ early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+ history = model.fit(x_train, y_train, epochs=2, batch_size=128,
+ validation_split=0.2, callbacks=[early_stopping], verbose=1)
+ _, accuracy = model.evaluate(x_test, y_test, verbose=0)
+ print(f"Test Accuracy: {accuracy:.4f}")
+ if accuracy > best_accuracy:
+ best_accuracy = accuracy
+ best_model = model
+print(f"Best Model Test Accuracy: {best_accuracy:.4f}")
+best_model.save('best_model.h5')
+
+_________________________________
+
+Image classification in DNN using pre trained
+import tensorflow as tf
+from tensorflow.keras.preprocessing import image
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.applications.resnet50 import preprocess_input, decode_predictions
+from tensorflow.keras import layers, models
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.datasets import cifar10
+(X_train, y_train), (X_test, y_test) = cifar10.load_data()
+X_train = X_train.astype('float32') / 255.0
+X_test = X_test.astype('float32') / 255.0
+base_model = ResNet50(weights='imagenet', include_top=False, input_shape=(32, 32, 3))
+model = models.Sequential([
+ base_model,
+ layers.GlobalAveragePooling2D(),
+ layers.Dense(1024, activation='relu'),
+ layers.Dropout(0.5),
+ layers.Dense(10, activation='softmax') 
+])
+base_model.trainable = False
+model.compile(optimizer='adam',
+ loss='sparse_categorical_crossentropy',
+ metrics=['accuracy'])
+model.fit(X_train, y_train, epochs=1, batch_size=64, validation_split=0.2)
+test_loss, test_accuracy = model.evaluate(X_test, y_test)
+print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
+img_path = '/content/plane.jpeg' 
+img = image.load_img(img_path, target_size=(32, 32)) 
+img_array = image.img_to_array(img)
+img_array = np.expand_dims(img_array, axis=0) 
+img_array = img_array.astype('float32') / 255.0 
+prediction = model.predict(img_array)
+predicted_class = np.argmax(prediction)
+print(f"Predicted Class: {predicted_class}")
+plt.imshow(img)
+plt.axis('off')
+plt.show()
+
+_______________________________
+
+Sales recommendations
+import tensorflow as tf
+from tensorflow.keras import layers, models, optimizers
+import numpy as np
+import pandas as pd 
+data = pd.DataFrame({
+ 'user_id': np.random.randint(0, 100, size=1000), # 100 users
+ 'item_id': np.random.randint(0, 50, size=1000), # 50 items
+ 'rating': np.random.rand(1000) * 5 # Ratings between 0 and 5
+})
+num_users = data['user_id'].nunique()
+num_items = data['item_id'].nunique()
+user_input = layers.Input(shape=(1,), name='user')
+item_input = layers.Input(shape=(1,), name='item')
+user_embedding = layers.Embedding(input_dim=num_users, output_dim=20)(user_input)
+item_embedding = layers.Embedding(input_dim=num_items, output_dim=20)(item_input)
+user_vec = layers.Flatten()(user_embedding)
+item_vec = layers.Flatten()(item_embedding)
+concat = layers.concatenate([user_vec, item_vec])
+x = layers.Dense(128, activation='relu')(concat)
+x = layers.Dense(64, activation='relu')(x)
+x = layers.Dense(32, activation='relu')(x)
+output = layers.Dense(1, activation='linear')(x) # For regression (rating prediction)
+model = models.Model(inputs=[user_input, item_input], outputs=output)
+model.compile(optimizer=optimizers.Adam(learning_rate=0.001), loss='mse', metrics=['mae'])
+user_data = data['user_id'].values
+item_data = data['item_id'].values
+ratings = data['rating'].values
+model.fit([user_data, item_data], ratings, epochs=10, batch_size=64, validation_split=0.2)
+user_id = 10 
+item_id = 5 
+predicted_rating = model.predict([np.array([user_id]), np.array([item_id])])
+print(f"Predicted Rating for User {user_id} on Item {item_id}: {predicted_rating[0][0]}")
+user_id = 10 
+item_ids = np.arange(num_items) 
+predicted_ratings = model.predict([np.array([user_id] * len(item_ids)), item_ids])
+top_5_items = np.argsort(predicted_ratings.flatten())[-5:][::-1]
+print(f"Top 5 recommended items for User {user_id}: {top_5_items}")
