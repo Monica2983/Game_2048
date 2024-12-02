@@ -1,0 +1,208 @@
+1.1.	Implement union, intersection, and complement operations on fuzzy sets.import numpy as np
+
+# Define fuzzy sets A and B
+A = np.array([0.1, 0.4, 0.5, 0.7, 0.9])
+B = np.array([0.2, 0.3, 0.6, 0.8, 1.0])
+
+# Union of A and B
+union = np.maximum(A, B)
+print("Union:", union)
+
+# Intersection of A and B
+intersection = np.minimum(A, B)
+print("Intersection:", intersection)
+
+# Complement of A
+complement_A = 1 - A
+print("Complement of A:", complement_A)
+
+# Complement of B
+complement_B = 1 - B
+print("Complement of B:", complement_B)
+
+------------------------------------------------------------------
+de morgan
+
+import numpy as np
+
+# Define fuzzy sets A and B
+A = np.array([0.1, 0.4, 0.5, 0.7, 0.9])
+B = np.array([0.2, 0.3, 0.6, 0.8, 1.0])
+
+# Union of A and B
+union = np.maximum(A, B)
+print("Union:", union)
+
+# Intersection of A and B
+intersection = np.minimum(A, B)
+print("Intersection:", intersection)
+
+# Complement of A
+complement_A = 1 - A
+print("Complement of A:", complement_A)
+
+# Complement of B
+complement_B = 1 - B
+print("Complement of B:", complement_B)
+
+# Verify De Morgan's First Law
+de_morgan_first = 1 - union
+de_morgan_first_lhs = np.minimum(complement_A, complement_B)
+print("De Morgan's First Law LHS:", de_morgan_first)
+print("De Morgan's First Law RHS:", de_morgan_first_lhs)
+print("De Morgan's First Law Verified:", np.allclose(de_morgan_first, de_morgan_first_lhs))
+
+# Verify De Morgan's Second Law
+de_morgan_second = 1 - intersection
+de_morgan_second_lhs = np.maximum(complement_A, complement_B)
+print("De Morgan's Second Law LHS:", de_morgan_second)
+print("De Morgan's Second Law RHS:", de_morgan_second_lhs)
+print("De Morgan's Second Law Verified:", np.allclose(de_morgan_second, de_morgan_second_lhs))
+
+-------------------------------------------------------------------------------------
+
+fuzzy inference
+
+import numpy as np
+
+# Define Membership Functions
+def triangular_mf(x, a, b, c):
+    return np.maximum(np.minimum((x-a)/(b-a), (c-x)/(c-b)), 0)
+
+def trapezoidal_mf(x, a, b, c, d):
+    return np.maximum(np.minimum(np.minimum((x-a)/(b-a), 1), (d-x)/(d-c)), 0)
+
+def gaussian_mf(x, mu, sigma):
+    return np.exp(-0.5 * ((x - mu) / sigma) ** 2)
+
+# Define Fuzzy Inference System
+def fuzzy_inference_system(temperature):
+    # Fuzzification
+    cold = triangular_mf(temperature, 0, 0, 15)
+    warm = trapezoidal_mf(temperature, 10, 15, 25, 30)
+    hot = gaussian_mf(temperature, 30, 5)
+
+    # Inference
+    low = np.fmax(cold, 0)
+    medium = np.fmax(warm, 0)
+    high = np.fmax(hot, 0)
+
+    # Defuzzification (Weighted Average)
+    fan_speed = (low * 10 + medium * 50 + high * 90) / (low + medium + high)
+    return fan_speed
+
+# Example Usage
+temperature = 20
+fan_speed = fuzzy_inference_system(temperature)
+print(f"Temperature: {temperature}°C, Fan Speed: {fan_speed}")
+
+--------------------------------------------------------------------------------------
+
+fuzzy ctrl
+
+pip install scikit-fuzzy 
+import numpy as np 
+import skfuzzy as fuzz 
+from skfuzzy import control as ctrl 
+# Create Antecedent/Consequent objects for temperature and fan speed 
+temperature = ctrl.Antecedent(np.arange(0, 101, 1), 'temperature') 
+fan_speed = ctrl.Consequent(np.arange(0, 101, 1), 'fan_speed') 
+# Define membership functions for temperature 
+  
+temperature['low'] = fuzz.trimf(temperature.universe, [0, 0, 50]) 
+temperature['medium'] = fuzz.trimf(temperature.universe, [0, 50, 100]) 
+temperature['high'] = fuzz.trimf(temperature.universe, [50, 100, 100]) 
+# Define membership functions for fan speed 
+fan_speed['low'] = fuzz.trimf(fan_speed.universe, [0, 0, 50]) 
+fan_speed['medium'] = fuzz.trimf(fan_speed.universe, [0, 50, 100]) 
+fan_speed['high'] = fuzz.trimf(fan_speed.universe, [50, 100, 100]) 
+# Define fuzzy rules 
+rule1 = ctrl.Rule(temperature['low'], fan_speed['low']) 
+rule2 = ctrl.Rule(temperature['medium'], fan_speed['medium']) 
+rule3 = ctrl.Rule(temperature['high'], fan_speed['high']) 
+# Create control system and add rules 
+fan_ctrl = ctrl.ControlSystem([rule1, rule2, rule3]) 
+fan_speed_ctrl = ctrl.ControlSystemSimulation(fan_ctrl) 
+# Input the temperature value 
+temperature_value = 75 
+# Pass the input to the control system 
+fan_speed_ctrl.input['temperature'] = temperature_value 
+# Compute and print the result 
+fan_speed_ctrl.compute() 
+print("Fan Speed:", fan_speed_ctrl.output['fan_speed']) 
+# Plot membership functions and output 
+temperature.view() 
+fan_speed.view() 
+fan_speed.view(sim=fan_speed_ctrl)
+
+-----------------------------------------------------------------------------------
+
+Xor with bp
+
+def sigmoid(x): 
+    return 1 / (1 + np.exp(-x)) 
+def sigmoid_derivative(x): 
+    return x * (1 - x) 
+# XOR input and target data 
+input_data = np.array([[0, 0], [0, 1], [1, 0], [1, 1]]) 
+target_data = np.array([[0], [1], [1], [0]]) 
+# Neural network architecture 
+input_size, hidden_size, output_size = 2, 2, 1 
+learning_rate, epochs = 0.1, 10000 
+hidden_weights = np.random.uniform(size=(input_size, hidden_size)) 
+output_weights = np.random.uniform(size=(hidden_size, output_size)) 
+# Training loop 
+for _ in range(epochs): 
+    # Forward propagation 
+    hidden_output = sigmoid(np.dot(input_data, hidden_weights)) 
+    predicted_output = sigmoid(np.dot(hidden_output, output_weights)) 
+    # Calculate error and backpropagation 
+    error = target_data - predicted_output 
+    output_delta = error * sigmoid_derivative(predicted_output) 
+    hidden_delta = output_delta.dot(output_weights.T)  * 
+sigmoid_derivative(hidden_output)     
+    # Update weights 
+    output_weights += hidden_output.T.dot(output_delta) * learning_rate 
+    hidden_weights += input_data.T.dot(hidden_delta) * learning_rate 
+# Test the trained network 
+test_data = np.array([[0, 0], [0, 1], [1, 0], [1, 1]]) 
+for data in test_data: 
+    hidden_output = sigmoid(np.dot(data, hidden_weights)) 
+    predicted_output = sigmoid(np.dot(hidden_output, output_weights)) 
+    print(f"Input: {data} Predicted Output: {predicted_output[0]}")
+
+-------------------------------------------------------------------------------
+
+self organizing maps
+import numpy as np 
+import matplotlib.pyplot as plt 
+from minisom import MiniSom 
+# Generate sample data (replace this with your own dataset) 
+np.random.seed(42) 
+data = np.random.rand(100, 2) 
+# SOM parameters 
+grid_size = (10, 10) 
+input_dim = 2 
+learning_rate = 0.5 
+num_epochs = 1000 
+# Initialize and train the SOM 
+som = MiniSom(grid_size[0], grid_size[1], input_dim, sigma=1.0, 
+learning_rate=learning_rate) 
+som.random_weights_init(data) 
+som.train_random(data, num_epochs) 
+# Create a map of cluster assignments 
+cluster_map = np.zeros((grid_size[0], grid_size[1]), dtype=int) 
+for i in range(grid_size[0]): 
+    for j in range(grid_size[1]): 
+        distances = np.linalg.norm(data - som.get_weights()[i, j], axis=-1) 
+        cluster_map[i, j] = np.argmin(distances) 
+# Visualize the results 
+plt.figure(figsize=(8, 8)) 
+plt.pcolormesh(cluster_map, cmap='viridis') 
+plt.colorbar(label='Cluster') 
+plt.scatter(data[:, 0] * grid_size[0], data[:, 1] * grid_size[1], color='red', label='Data  
+points') 
+plt.legend() 
+plt.title('Self-Organizing Map Clustering') 
+plt.show()
+
